@@ -12,6 +12,7 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { TrendingUp, TrendingDown, Plus, Landmark } from 'lucide-react-native';
 import { Transaction } from '../types';
@@ -29,14 +30,14 @@ interface Props {
 }
 
 const COLORS = {
-  bg: '#0A0A1A',
-  sheet: '#16162E',
-  border: 'rgba(255,255,255,0.08)',
-  income: '#10D9A5',
-  expense: '#FF5E6C',
-  accent: '#7B6EF5',
-  text: '#F0F0FF',
-  muted: 'rgba(240,240,255,0.45)',
+  bg: '#000000',
+  sheet: '#1A1C1E',
+  border: 'rgba(255,255,255,0.10)',
+  income: '#30D158',
+  expense: '#FF453A',
+  accent: '#FFFFFF',
+  text: '#FFFFFF',
+  muted: 'rgba(255,255,255,0.45)',
   surface: 'rgba(255,255,255,0.04)',
 };
 
@@ -151,9 +152,11 @@ const AddTransactionModal: React.FC<Props> = ({
       onRequestClose={handleClose}>
       <View style={styles.overlay}>
         <Pressable 
-          style={styles.backdrop} 
+          style={StyleSheet.absoluteFill} 
           onPress={handleClose} 
-        />
+        >
+          <View style={styles.backdrop} />
+        </Pressable>
         
         <Animated.View 
           style={[styles.sheet, { transform: [{ translateY }] }]}
@@ -264,6 +267,30 @@ const AddTransactionModal: React.FC<Props> = ({
               <Plus size={18} color="#fff" strokeWidth={2.5} style={{ marginRight: 6 }} />
               <Text style={styles.addBtnText}>{editingTransaction ? 'Save Changes' : 'Add to Plan'}</Text>
             </TouchableOpacity>
+
+            {editingTransaction && (
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => {
+                  Alert.alert('Remove Entry', 'Delete this planned entry?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        if (editingTransaction && onUpdate) {
+                          // Pass empty parameters or map a custom status/callback to trigger deletion
+                          onUpdate(editingTransaction.id, null as any);
+                          handleClose();
+                        }
+                      },
+                    },
+                  ]);
+                }}
+                activeOpacity={0.85}>
+                <Text style={styles.deleteBtnText}>Delete Entry</Text>
+              </TouchableOpacity>
+            )}
           </KeyboardAvoidingView>
         </Animated.View>
       </View>
@@ -402,6 +429,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 17,
     letterSpacing: 0.3,
+  },
+  deleteBtn: {
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: '#FF453A',
+    backgroundColor: 'rgba(255, 69, 58, 0.08)',
+  },
+  deleteBtnText: {
+    color: '#FF453A',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
 

@@ -27,16 +27,16 @@ import { formatCurrency, getCurrentMonthId, getClosingBalance } from '../utils';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const C = {
-  bg: '#080B14',
-  surface: '#111827',
-  sheet: '#16162E',
-  border: 'rgba(255,255,255,0.07)',
-  income: '#10D9A5',
-  expense: '#FF5E6C',
-  accent: '#7B6EF5',
-  text: '#F0F0FF',
-  muted: 'rgba(240,240,255,0.45)',
-  mutedHigh: 'rgba(240,240,255,0.65)',
+  bg: '#000000',
+  surface: '#121212',
+  sheet: '#1A1C1E',
+  border: 'rgba(255,255,255,0.10)',
+  income: '#30D158',
+  expense: '#FF453A',
+  accent: '#FFFFFF',
+  text: '#FFFFFF',
+  muted: 'rgba(255,255,255,0.45)',
+  mutedHigh: 'rgba(255,255,255,0.65)',
 };
 
 const WalletScreen = () => {
@@ -283,64 +283,74 @@ const WalletScreen = () => {
 
       {/* Add / Edit Modal */}
       <Modal visible={showModal} transparent animationType="none" onRequestClose={handleClose}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <View style={styles.overlay}>
+          <Pressable 
+            style={StyleSheet.absoluteFill} 
+            onPress={handleClose} 
+          >
+            <View style={styles.backdrop} />
+          </Pressable>
           <Animated.View 
             style={[styles.sheet, { transform: [{ translateY }] }]}
             {...panResponder.panHandlers}
           >
-            <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>{editing ? 'Edit Account' : 'Add Account'}</Text>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={20}
+            >
+              <View style={styles.handle} />
+              <Text style={styles.sheetTitle}>{editing ? 'Edit Account' : 'Add Account'}</Text>
 
-            {/* Type selector */}
-            <Text style={styles.inputLabel}>Account Type</Text>
-            <View style={styles.typeRow}>
-              <TouchableOpacity 
-                style={[styles.typeBtn, accountType === 'bank' && styles.typeBtnActive]} 
-                onPress={() => setAccountType('bank')}
-              >
-                <CreditCard size={15} color={accountType === 'bank' ? '#FFF' : C.muted} />
-                <Text style={[styles.typeText, accountType === 'bank' && styles.typeTextActive]}>Bank Card</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.typeBtn, accountType === 'cash' && styles.typeBtnActive]} 
-                onPress={() => setAccountType('cash')}
-              >
-                <Wallet size={15} color={accountType === 'cash' ? '#FFF' : C.muted} />
-                <Text style={[styles.typeText, accountType === 'cash' && styles.typeTextActive]}>Cash in Hand</Text>
-              </TouchableOpacity>
-            </View>
+              {/* Type selector */}
+              <Text style={styles.inputLabel}>Account Type</Text>
+              <View style={styles.typeRow}>
+                <TouchableOpacity 
+                  style={[styles.typeBtn, accountType === 'bank' && styles.typeBtnActive]} 
+                  onPress={() => setAccountType('bank')}
+                >
+                  <CreditCard size={15} color={accountType === 'bank' ? '#FFF' : C.muted} />
+                  <Text style={[styles.typeText, accountType === 'bank' && styles.typeTextActive]}>Bank Card</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.typeBtn, accountType === 'cash' && styles.typeBtnActive]} 
+                  onPress={() => setAccountType('cash')}
+                >
+                  <Wallet size={15} color={accountType === 'cash' ? '#FFF' : C.muted} />
+                  <Text style={[styles.typeText, accountType === 'cash' && styles.typeTextActive]}>Cash in Hand</Text>
+                </TouchableOpacity>
+              </View>
 
-            <Text style={styles.inputLabel}>Account Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. HDFC Savings, Cash Wallet..."
-              placeholderTextColor={C.muted}
-              value={inputName}
-              onChangeText={setInputName}
-              autoFocus
-            />
-
-            <Text style={styles.inputLabel}>Balance (₹)</Text>
-            <View style={styles.amountRow}>
-              <Text style={styles.rupee}>₹</Text>
+              <Text style={styles.inputLabel}>Account Name</Text>
               <TextInput
-                style={styles.amountInput}
-                placeholder="0"
+                style={styles.input}
+                placeholder="e.g. HDFC Savings, Cash Wallet..."
                 placeholderTextColor={C.muted}
-                value={inputAmount}
-                onChangeText={setInputAmount}
-                keyboardType="numeric"
-                returnKeyType="done"
-                onSubmitEditing={handleSave}
+                value={inputName}
+                onChangeText={setInputName}
+                autoFocus
               />
-            </View>
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-              <Text style={styles.saveBtnText}>{editing ? 'Update' : 'Add Account'}</Text>
-            </TouchableOpacity>
+              <Text style={styles.inputLabel}>Balance (₹)</Text>
+              <View style={styles.amountRow}>
+                <Text style={styles.rupee}>₹</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  placeholder="0"
+                  placeholderTextColor={C.muted}
+                  value={inputAmount}
+                  onChangeText={setInputAmount}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSave}
+                />
+              </View>
+
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
+                <Text style={styles.saveBtnText}>{editing ? 'Update' : 'Add Account'}</Text>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
           </Animated.View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -381,8 +391,8 @@ const styles = StyleSheet.create({
 
   accountsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 },
   sectionTitle: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.accent + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: C.accent + '30' },
-  addBtnText: { color: C.accent, fontSize: 13, fontWeight: '600' },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(123, 110, 245, 0.18)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(123, 110, 245, 0.30)' },
+  addBtnText: { color: '#7B6EF5', fontSize: 13, fontWeight: '600' },
 
   accRow: {
     flexDirection: 'row',
@@ -396,7 +406,7 @@ const styles = StyleSheet.create({
     borderColor: C.border,
   },
   accLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  accIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' },
+  accIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   accName: { color: C.text, fontSize: 15, fontWeight: '600' },
   accUpdated: { color: C.muted, fontSize: 11, marginTop: 2 },
   accRight: { alignItems: 'flex-end', gap: 6 },
@@ -407,7 +417,7 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
   emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
-  emptyAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.accent, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
+  emptyAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#7B6EF5', borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
   emptyAddBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   overlay: { flex: 1, justifyContent: 'flex-end' },
@@ -416,7 +426,7 @@ const styles = StyleSheet.create({
   sheetTitle: { color: C.text, fontSize: 20, fontWeight: '700', marginBottom: 20 },
   typeRow: { flexDirection: 'row', gap: 12, marginBottom: 18 },
   typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1.5, borderColor: C.border, borderRadius: 12, paddingVertical: 12 },
-  typeBtnActive: { backgroundColor: C.accent, borderColor: C.accent },
+  typeBtnActive: { backgroundColor: '#7B6EF5', borderColor: '#7B6EF5' },
   typeText: { color: C.muted, fontWeight: '600', fontSize: 14 },
   typeTextActive: { color: '#FFF' },
   inputLabel: { color: C.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 },

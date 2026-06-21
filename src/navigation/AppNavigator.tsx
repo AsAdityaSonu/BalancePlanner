@@ -10,10 +10,10 @@ import HomeScreen from '../screens/HomeScreen';
 import OverviewScreen from '../screens/OverviewScreen';
 import WalletScreen from '../screens/WalletScreen';
 
-const ACCENT = '#7B6EF5';
-const MUTED = 'rgba(240,240,255,0.30)';
-const BAR_BG = '#0C1020';
-const BORDER = 'rgba(255,255,255,0.07)';
+const ACCENT = '#FFFFFF';
+const MUTED = 'rgba(255,255,255,0.40)';
+const BAR_BG = '#121212';
+const BORDER = 'rgba(255,255,255,0.10)';
 
 // Inline simpler icon designs to remove lucide-react-native and react-native-svg dependency entirely
 const PlanIcon = ({ color }: { color: string }) => (

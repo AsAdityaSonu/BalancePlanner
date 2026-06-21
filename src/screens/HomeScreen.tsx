@@ -39,16 +39,16 @@ import {
 } from '../utils';
 
 const C = {
-  bg: '#080B14',
-  surface: '#111827',
-  card: '#1A1F35',
-  border: 'rgba(255,255,255,0.07)',
-  income: '#10D9A5',
-  expense: '#FF5E6C',
-  accent: '#7B6EF5',
-  text: '#F0F0FF',
-  muted: 'rgba(240,240,255,0.45)',
-  mutedHigh: 'rgba(240,240,255,0.65)',
+  bg: '#000000',
+  surface: '#121212',
+  card: '#1C1C1E',
+  border: 'rgba(255,255,255,0.10)',
+  income: '#30D158', // iOS System Green
+  expense: '#FF453A', // iOS System Red
+  accent: '#FFFFFF',
+  text: '#FFFFFF',
+  muted: 'rgba(255,255,255,0.45)',
+  mutedHigh: 'rgba(255,255,255,0.65)',
 };
 
 const HomeScreen = () => {
@@ -118,33 +118,41 @@ const HomeScreen = () => {
     }
   };
 
-  const handleUpdateTransaction = async (id: string, updatedPayload: Omit<Transaction, 'id' | 'createdAt'>) => {
+  const handleUpdateTransaction = async (id: string, updatedPayload: Omit<Transaction, 'id' | 'createdAt'> | null) => {
     if (!monthData) return;
     
     // Find old transaction to revert wallet balances
     const oldTx = monthData.transactions.find(t => t.id === id);
     
-    // Create new array of transactions
-    const updatedTransactions = monthData.transactions.map(t => {
-      if (t.id === id) {
-        return { ...t, ...updatedPayload };
-      }
-      return t;
-    });
+    if (updatedPayload === null) {
+      // Execute Delete
+      const updated = { ...monthData, transactions: monthData.transactions.filter(t => t.id !== id) };
+      setMonthData(updated);
+      await saveMonth(updated);
 
-    const updated = { ...monthData, transactions: updatedTransactions };
-    setMonthData(updated);
-    await saveMonth(updated);
-
-    // Dynamic wallet reconciliation logic
-    if (oldTx) {
-      // 1. Revert the old wallet balances (subtract its impact)
-      if (oldTx.accountId) {
+      if (oldTx && oldTx.accountId) {
         await updateWalletForTransaction(oldTx.accountId, oldTx.amount, oldTx.type, 'delete');
       }
-      // 2. Apply the new wallet balances (add the new impact)
-      if (updatedPayload.accountId) {
-        await updateWalletForTransaction(updatedPayload.accountId, updatedPayload.amount, updatedPayload.type, 'add');
+    } else {
+      // Execute Edit Update
+      const updatedTransactions = monthData.transactions.map(t => {
+        if (t.id === id) {
+          return { ...t, ...updatedPayload };
+        }
+        return t;
+      });
+
+      const updated = { ...monthData, transactions: updatedTransactions };
+      setMonthData(updated);
+      await saveMonth(updated);
+
+      if (oldTx) {
+        if (oldTx.accountId) {
+          await updateWalletForTransaction(oldTx.accountId, oldTx.amount, oldTx.type, 'delete');
+        }
+        if (updatedPayload.accountId) {
+          await updateWalletForTransaction(updatedPayload.accountId, updatedPayload.amount, updatedPayload.type, 'add');
+        }
       }
     }
     
@@ -424,14 +432,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(123, 110, 245, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     maxWidth: 90,
   },
   linkedBadgeText: {
-    color: '#7B6EF5',
+    color: '#FFFFFF',
     fontSize: 9,
     fontWeight: '700',
   },
@@ -444,7 +454,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute', bottom: 32, right: 24,
     width: 58, height: 58, borderRadius: 18,
-    backgroundColor: C.accent,
+    backgroundColor: '#7B6EF5',
     alignItems: 'center', justifyContent: 'center',
   },
 

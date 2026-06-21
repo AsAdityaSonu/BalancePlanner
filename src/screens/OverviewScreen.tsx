@@ -17,15 +17,15 @@ import { getAllMonthIds, getMonth } from '../storage';
 import { formatCurrency, getMonthLabel, getClosingBalance } from '../utils';
 
 const C = {
-  bg: '#080B14',
-  surface: '#111827',
-  border: 'rgba(255,255,255,0.07)',
-  income: '#10D9A5',
-  expense: '#FF5E6C',
-  accent: '#7B6EF5',
-  text: '#F0F0FF',
-  muted: 'rgba(240,240,255,0.45)',
-  mutedHigh: 'rgba(240,240,255,0.65)',
+  bg: '#000000',
+  surface: '#121212',
+  border: 'rgba(255,255,255,0.10)',
+  income: '#30D158',
+  expense: '#FF453A',
+  accent: '#FFFFFF',
+  text: '#FFFFFF',
+  muted: 'rgba(255,255,255,0.45)',
+  mutedHigh: 'rgba(255,255,255,0.65)',
 };
 
 interface MonthSummary {
