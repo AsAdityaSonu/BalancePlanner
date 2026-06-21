@@ -4,8 +4,8 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeScreen from '../screens/HomeScreen';
 import OverviewScreen from '../screens/OverviewScreen';
 import WalletScreen from '../screens/WalletScreen';
@@ -41,16 +41,17 @@ const WalletIcon = ({ color }: { color: string }) => (
 
 export default function AppNavigator() {
   const [activeTab, setActiveTab] = useState<'Plan' | 'Overview' | 'Wallet'>('Plan');
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.content}>
         {activeTab === 'Plan' && <HomeScreen />}
         {activeTab === 'Overview' && <OverviewScreen />}
         {activeTab === 'Wallet' && <WalletScreen />}
       </View>
 
-      <View style={styles.bar}>
+      <View style={[styles.bar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 10 }]}>
         <TouchableOpacity
           style={styles.item}
           onPress={() => setActiveTab('Plan')}
@@ -84,7 +85,7 @@ export default function AppNavigator() {
           <Text style={[styles.label, { color: activeTab === 'Wallet' ? ACCENT : MUTED }]}>Wallet</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -93,6 +94,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#080B14',
   },
+
   content: {
     flex: 1,
   },
