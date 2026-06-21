@@ -1,4 +1,6 @@
 {
   "name": "BalancePlanner",
-  "displayName": "BalancePlanner"
+  "displayName": "BalancePlanner",
+  "version": "1.2",
+  "build": 3
 }

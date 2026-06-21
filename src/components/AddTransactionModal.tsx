@@ -14,7 +14,7 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
-import { TrendingUp, TrendingDown, Plus, Landmark } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, Plus, Landmark, X } from 'lucide-react-native';
 import { Transaction } from '../types';
 import { BankAccount } from '../storage/wallet';
 
@@ -150,7 +150,10 @@ const AddTransactionModal: React.FC<Props> = ({
       transparent
       animationType="none"
       onRequestClose={handleClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.overlay}
+      >
         <Pressable 
           style={StyleSheet.absoluteFill} 
           onPress={handleClose} 
@@ -162,138 +165,138 @@ const AddTransactionModal: React.FC<Props> = ({
           style={[styles.sheet, { transform: [{ translateY }] }]}
           {...panResponder.panHandlers}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={20}
-          >
-            {/* Header handle */}
-            <View style={styles.handle} />
+          {/* Header handle */}
+          <View style={styles.handle} />
 
+          <View style={styles.sheetHeader}>
             <Text style={styles.title}>{editingTransaction ? 'Edit Entry' : 'Add Entry'}</Text>
+            <TouchableOpacity style={styles.closeIconBtn} onPress={handleClose} activeOpacity={0.7}>
+              <X size={20} color={COLORS.muted} strokeWidth={2.2} />
+            </TouchableOpacity>
+          </View>
 
-            {/* Type Toggle */}
-            <View style={styles.toggle}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleBtn,
-                  type === 'income' && { backgroundColor: COLORS.income + '22', borderColor: COLORS.income },
-                ]}
-                onPress={() => setType('income')}
-                activeOpacity={0.7}>
-                <TrendingUp size={16} color={type === 'income' ? COLORS.income : COLORS.muted} strokeWidth={2.5} />
-                <Text style={[styles.toggleText, type === 'income' && { color: COLORS.income }]}>
-                  Income
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.toggleBtn,
-                  type === 'expense' && { backgroundColor: COLORS.expense + '22', borderColor: COLORS.expense },
-                ]}
-                onPress={() => setType('expense')}
-                activeOpacity={0.7}>
-                <TrendingDown size={16} color={type === 'expense' ? COLORS.expense : COLORS.muted} strokeWidth={2.5} />
-                <Text style={[styles.toggleText, type === 'expense' && { color: COLORS.expense }]}>
-                  Expense
-                </Text>
-              </TouchableOpacity>
-            </View>
+          {/* Type Toggle */}
+          <View style={styles.toggle}>
+            <TouchableOpacity
+              style={[
+                styles.toggleBtn,
+                type === 'income' && { backgroundColor: COLORS.income + '22', borderColor: COLORS.income },
+              ]}
+              onPress={() => setType('income')}
+              activeOpacity={0.7}>
+              <TrendingUp size={16} color={type === 'income' ? COLORS.income : COLORS.muted} strokeWidth={2.5} />
+              <Text style={[styles.toggleText, type === 'income' && { color: COLORS.income }]}>
+                Income
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.toggleBtn,
+                type === 'expense' && { backgroundColor: COLORS.expense + '22', borderColor: COLORS.expense },
+              ]}
+              onPress={() => setType('expense')}
+              activeOpacity={0.7}>
+              <TrendingDown size={16} color={type === 'expense' ? COLORS.expense : COLORS.muted} strokeWidth={2.5} />
+              <Text style={[styles.toggleText, type === 'expense' && { color: COLORS.expense }]}>
+                Expense
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-            {/* Description */}
+          {/* Description */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Description</Text>
+            <TextInput
+              style={[styles.input, { borderColor: accentColor + '40' }]}
+              placeholder="e.g. Rent, Salary, Food..."
+              placeholderTextColor={COLORS.muted}
+              value={description}
+              onChangeText={setDescription}
+              returnKeyType="next"
+              autoFocus
+            />
+          </View>
+
+          {/* Account Selection */}
+          {accounts.length > 0 && (
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Description</Text>
+              <Text style={styles.inputLabel}>Select Wallet Account</Text>
+              <View style={styles.accountsScroll}>
+                {accounts.map(acc => {
+                  const selected = selectedAccountId === acc.id;
+                  return (
+                    <TouchableOpacity
+                      key={acc.id}
+                      style={[
+                        styles.accountSelectorItem,
+                        selected && { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '15' }
+                      ]}
+                      onPress={() => setSelectedAccountId(acc.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Landmark size={13} color={selected ? COLORS.accent : COLORS.muted} />
+                      <Text style={[styles.accountSelectorText, selected && { color: COLORS.text }]}>
+                        {acc.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Amount */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Amount (₹)</Text>
+            <View style={[styles.amountRow, { borderColor: accentColor + '40' }]}>
+              <Text style={[styles.rupeeSign, { color: accentColor }]}>₹</Text>
               <TextInput
-                style={[styles.input, { borderColor: accentColor + '40' }]}
-                placeholder="e.g. Rent, Salary, Food..."
+                style={styles.amountInput}
+                placeholder="0"
                 placeholderTextColor={COLORS.muted}
-                value={description}
-                onChangeText={setDescription}
-                returnKeyType="next"
-                autoFocus
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="numeric"
+                returnKeyType="done"
+                onSubmitEditing={handleSave}
               />
             </View>
+          </View>
 
-            {/* Account Selection */}
-            {accounts.length > 0 && (
-              <View style={styles.inputWrapper}>
-                <Text style={styles.inputLabel}>Select Wallet Account</Text>
-                <View style={styles.accountsScroll}>
-                  {accounts.map(acc => {
-                    const selected = selectedAccountId === acc.id;
-                    return (
-                      <TouchableOpacity
-                        key={acc.id}
-                        style={[
-                          styles.accountSelectorItem,
-                          selected && { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '15' }
-                        ]}
-                        onPress={() => setSelectedAccountId(acc.id)}
-                        activeOpacity={0.8}
-                      >
-                        <Landmark size={13} color={selected ? COLORS.accent : COLORS.muted} />
-                        <Text style={[styles.accountSelectorText, selected && { color: COLORS.text }]}>
-                          {acc.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
+          {/* Add/Save Button */}
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: accentColor }]}
+            onPress={handleSave}
+            activeOpacity={0.85}>
+            <Plus size={18} color="#fff" strokeWidth={2.5} style={{ marginRight: 6 }} />
+            <Text style={styles.addBtnText}>{editingTransaction ? 'Save Changes' : 'Add to Plan'}</Text>
+          </TouchableOpacity>
 
-            {/* Amount */}
-            <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Amount (₹)</Text>
-              <View style={[styles.amountRow, { borderColor: accentColor + '40' }]}>
-                <Text style={[styles.rupeeSign, { color: accentColor }]}>₹</Text>
-                <TextInput
-                  style={styles.amountInput}
-                  placeholder="0"
-                  placeholderTextColor={COLORS.muted}
-                  value={amount}
-                  onChangeText={setAmount}
-                  keyboardType="numeric"
-                  returnKeyType="done"
-                  onSubmitEditing={handleSave}
-                />
-              </View>
-            </View>
-
-            {/* Add/Save Button */}
+          {editingTransaction && (
             <TouchableOpacity
-              style={[styles.addBtn, { backgroundColor: accentColor }]}
-              onPress={handleSave}
-              activeOpacity={0.85}>
-              <Plus size={18} color="#fff" strokeWidth={2.5} style={{ marginRight: 6 }} />
-              <Text style={styles.addBtnText}>{editingTransaction ? 'Save Changes' : 'Add to Plan'}</Text>
-            </TouchableOpacity>
-
-            {editingTransaction && (
-              <TouchableOpacity
-                style={styles.deleteBtn}
-                onPress={() => {
-                  Alert.alert('Remove Entry', 'Delete this planned entry?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Delete',
-                      style: 'destructive',
-                      onPress: () => {
-                        if (editingTransaction && onUpdate) {
-                          // Pass empty parameters or map a custom status/callback to trigger deletion
-                          onUpdate(editingTransaction.id, null as any);
-                          handleClose();
-                        }
-                      },
+              style={styles.deleteBtn}
+              onPress={() => {
+                Alert.alert('Remove Entry', 'Delete this planned entry?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                      if (editingTransaction && onUpdate) {
+                        // Pass empty parameters or map a custom status/callback to trigger deletion
+                        onUpdate(editingTransaction.id, null as any);
+                        handleClose();
+                      }
                     },
-                  ]);
-                }}
-                activeOpacity={0.85}>
-                <Text style={styles.deleteBtnText}>Delete Entry</Text>
-              </TouchableOpacity>
-            )}
-          </KeyboardAvoidingView>
+                  },
+                ]);
+              }}
+              activeOpacity={0.85}>
+              <Text style={styles.deleteBtnText}>Delete Entry</Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -326,12 +329,25 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 20,
   },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
   title: {
     fontSize: 22,
     fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 20,
     letterSpacing: 0.3,
+  },
+  closeIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggle: {
     flexDirection: 'row',

@@ -19,7 +19,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Plus, Pencil, Trash2, Landmark, TrendingUp, TrendingDown, CreditCard, Wallet } from 'lucide-react-native';
+import { Plus, Pencil, Trash2, Landmark, TrendingUp, TrendingDown, CreditCard, Wallet, X } from 'lucide-react-native';
 import { BankAccount, getWallet, saveWallet } from '../storage/wallet';
 import { getMonth } from '../storage';
 import { formatCurrency, getCurrentMonthId, getClosingBalance } from '../utils';
@@ -299,7 +299,12 @@ const WalletScreen = () => {
               keyboardVerticalOffset={20}
             >
               <View style={styles.handle} />
-              <Text style={styles.sheetTitle}>{editing ? 'Edit Account' : 'Add Account'}</Text>
+              <View style={styles.sheetHeader}>
+                <Text style={styles.sheetTitle}>{editing ? 'Edit Account' : 'Add Account'}</Text>
+                <TouchableOpacity style={styles.closeIconBtn} onPress={handleClose} activeOpacity={0.7}>
+                  <X size={20} color={C.muted} strokeWidth={2.2} />
+                </TouchableOpacity>
+              </View>
 
               {/* Type selector */}
               <Text style={styles.inputLabel}>Account Type</Text>
@@ -423,7 +428,21 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#16162E', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, borderWidth: 1, borderBottomWidth: 0, borderColor: C.border },
   handle: { width: 42, height: 5, backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 2.5, alignSelf: 'center', marginBottom: 20 },
-  sheetTitle: { color: C.text, fontSize: 20, fontWeight: '700', marginBottom: 20 },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  sheetTitle: { color: C.text, fontSize: 20, fontWeight: '700' },
+  closeIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   typeRow: { flexDirection: 'row', gap: 12, marginBottom: 18 },
   typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1.5, borderColor: C.border, borderRadius: 12, paddingVertical: 12 },
   typeBtnActive: { backgroundColor: '#7B6EF5', borderColor: '#7B6EF5' },
