@@ -236,6 +236,16 @@ const HomeScreen = () => {
 
   const ListHeader = () => (
     <>
+      {/* App Logo Header */}
+      <View style={styles.logoHeader}>
+        <View style={styles.logoIcon}>
+          <View style={styles.logoDotActive} />
+          <View style={styles.logoLineHorizontal} />
+          <View style={styles.logoLineVertical} />
+        </View>
+        <Text style={styles.logoText}>current</Text>
+      </View>
+
       {/* Month Selector */}
       <View style={styles.monthRow}>
         <TouchableOpacity style={styles.navBtn} onPress={() => setMonthId(getPrevMonthId(monthId))} activeOpacity={0.7}>
@@ -476,6 +486,50 @@ const styles = StyleSheet.create({
   editInput: { flex: 1, paddingVertical: 14, color: C.text, fontSize: 24, fontWeight: '700' },
   editSave: { backgroundColor: C.accent, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   editSaveText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  logoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+  logoIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoDotActive: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#7B6EF5',
+    position: 'absolute',
+  },
+  logoLineHorizontal: {
+    width: 12,
+    height: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.40)',
+    position: 'absolute',
+  },
+  logoLineVertical: {
+    width: 2,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.40)',
+    position: 'absolute',
+  },
+  logoText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'lowercase',
+  },
 });
 
 export default HomeScreen;
