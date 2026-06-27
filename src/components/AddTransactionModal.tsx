@@ -13,29 +13,30 @@ import {
   PanResponder,
   Dimensions,
   Alert,
+  ScrollView,
 } from 'react-native';
-import { TrendingUp, TrendingDown, Plus, Landmark, X } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, Plus, ShoppingBag, X } from 'lucide-react-native';
 import { Transaction } from '../types';
-import { BankAccount } from '../storage/wallet';
+import { ThingToBuy } from '../storage/thingsToBuy';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onAdd: (t: Omit<Transaction, 'id' | 'createdAt'>) => void;
-  onUpdate?: (id: string, t: Omit<Transaction, 'id' | 'createdAt'>) => void;
-  accounts: BankAccount[];
+  onAdd: (t: Omit<Transaction, 'id' | 'createdAt'> & { thingToBuyId?: string }) => void;
+  onUpdate?: (id: string, t: Omit<Transaction, 'id' | 'createdAt'> & { thingToBuyId?: string }) => void;
+  thingsToBuy?: ThingToBuy[];
   editingTransaction?: Transaction | null;
 }
 
 const COLORS = {
   bg: '#000000',
-  sheet: '#1A1C1E',
+  sheet: '#16162E',
   border: 'rgba(255,255,255,0.10)',
   income: '#30D158',
   expense: '#FF453A',
-  accent: '#FFFFFF',
+  accent: '#7B6EF5',
   text: '#FFFFFF',
   muted: 'rgba(255,255,255,0.45)',
   surface: 'rgba(255,255,255,0.04)',
@@ -46,31 +47,29 @@ const AddTransactionModal: React.FC<Props> = ({
   onClose, 
   onAdd, 
   onUpdate, 
-  accounts, 
+  thingsToBuy = [], 
   editingTransaction 
 }) => {
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedThingId, setSelectedThingId] = useState<string>('');
 
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
-  // Pan Responder for swiping down to close
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldPanResponder: () => true,
-      onMoveShouldPanResponder: (_, gestureState) => gestureState.dy > 5,
-      onPanResponderMove: (_, gestureState) => {
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, gestureState) => gestureState.dy > 5,
+      onPanResponderMove: (_e, gestureState) => {
         if (gestureState.dy > 0) {
           translateY.setValue(gestureState.dy);
         }
       },
-      onPanResponderRelease: (_, gestureState) => {
+      onPanResponderRelease: (_e, gestureState) => {
         if (gestureState.dy > 120 || gestureState.vy > 0.5) {
           handleClose();
         } else {
-          // Snap back
           Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
@@ -88,16 +87,12 @@ const AddTransactionModal: React.FC<Props> = ({
         setType(editingTransaction.type);
         setDescription(editingTransaction.description);
         setAmount(String(editingTransaction.amount));
-        setSelectedAccountId(editingTransaction.accountId || '');
+        setSelectedThingId(editingTransaction.accountId || ''); // repurpose accountId as thingToBuyId in DB linking
       } else {
         setType('expense');
         setDescription('');
         setAmount('');
-        if (accounts.length > 0) {
-          setSelectedAccountId(accounts[0].id);
-        } else {
-          setSelectedAccountId('');
-        }
+        setSelectedThingId('');
       }
 
       Animated.spring(translateY, {
@@ -107,7 +102,7 @@ const AddTransactionModal: React.FC<Props> = ({
         tension: 90,
       }).start();
     }
-  }, [visible, translateY, accounts, editingTransaction]);
+  }, [visible, translateY, editingTransaction]);
 
   const handleClose = () => {
     Animated.timing(translateY, {
@@ -121,13 +116,16 @@ const AddTransactionModal: React.FC<Props> = ({
 
   const handleSave = () => {
     const num = parseFloat(amount.replace(/,/g, ''));
-    if (!description.trim() || isNaN(num) || num <= 0) return;
+    if (!description.trim() || isNaN(num) || num <= 0) {
+      Alert.alert('Invalid input', 'Please enter a description and amount.');
+      return;
+    }
     
     const payload = {
       description: description.trim(),
       amount: num,
       type,
-      accountId: selectedAccountId || undefined,
+      accountId: selectedThingId || undefined, // use accountId slot to store linked thing id
     };
 
     if (editingTransaction && onUpdate) {
@@ -139,10 +137,12 @@ const AddTransactionModal: React.FC<Props> = ({
     setDescription('');
     setAmount('');
     setType('expense');
+    setSelectedThingId('');
     handleClose();
   };
 
   const accentColor = type === 'income' ? COLORS.income : COLORS.expense;
+  const pendingThings = thingsToBuy.filter(item => !item.isPurchased);
 
   return (
     <Modal
@@ -165,7 +165,6 @@ const AddTransactionModal: React.FC<Props> = ({
           style={[styles.sheet, { transform: [{ translateY }] }]}
           {...panResponder.panHandlers}
         >
-          {/* Header handle */}
           <View style={styles.handle} />
 
           <View style={styles.sheetHeader}>
@@ -217,31 +216,39 @@ const AddTransactionModal: React.FC<Props> = ({
             />
           </View>
 
-          {/* Account Selection */}
-          {accounts.length > 0 && (
+          {/* Optional link to Wishlist / Things to Buy */}
+          {type === 'expense' && pendingThings.length > 0 && (
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Select Wallet Account</Text>
-              <View style={styles.accountsScroll}>
-                {accounts.map(acc => {
-                  const selected = selectedAccountId === acc.id;
+              <Text style={styles.inputLabel}>Link to Wishlist Item (Optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wishlistScroll}>
+                {pendingThings.map(item => {
+                  const selected = selectedThingId === item.id;
                   return (
                     <TouchableOpacity
-                      key={acc.id}
+                      key={item.id}
                       style={[
-                        styles.accountSelectorItem,
-                        selected && { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '15' }
+                        styles.wishlistItem,
+                        selected && { borderColor: COLORS.accent, backgroundColor: 'rgba(123, 110, 245, 0.15)' }
                       ]}
-                      onPress={() => setSelectedAccountId(acc.id)}
+                      onPress={() => {
+                        if (selected) {
+                          setSelectedThingId('');
+                        } else {
+                          setSelectedThingId(item.id);
+                          setDescription(`Purchase: ${item.name}`);
+                          setAmount(String(item.price));
+                        }
+                      }}
                       activeOpacity={0.8}
                     >
-                      <Landmark size={13} color={selected ? COLORS.accent : COLORS.muted} />
-                      <Text style={[styles.accountSelectorText, selected && { color: COLORS.text }]}>
-                        {acc.name}
+                      <ShoppingBag size={13} color={selected ? COLORS.accent : COLORS.muted} />
+                      <Text style={[styles.wishlistText, selected && { color: COLORS.text }]}>
+                        {item.name} ({formatCurrency(item.price)})
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
           )}
 
@@ -265,7 +272,7 @@ const AddTransactionModal: React.FC<Props> = ({
 
           {/* Add/Save Button */}
           <TouchableOpacity
-            style={[styles.addBtn, { backgroundColor: accentColor }]}
+            style={[styles.addBtn, { backgroundColor: COLORS.accent }]}
             onPress={handleSave}
             activeOpacity={0.85}>
             <Plus size={18} color="#fff" strokeWidth={2.5} style={{ marginRight: 6 }} />
@@ -283,7 +290,6 @@ const AddTransactionModal: React.FC<Props> = ({
                     style: 'destructive',
                     onPress: () => {
                       if (editingTransaction && onUpdate) {
-                        // Pass empty parameters or map a custom status/callback to trigger deletion
                         onUpdate(editingTransaction.id, null as any);
                         handleClose();
                       }
@@ -301,13 +307,22 @@ const AddTransactionModal: React.FC<Props> = ({
   );
 };
 
+// Helper for formatting
+const formatCurrency = (amount: number): string => {
+  return `₹${amount.toLocaleString('en-IN')}`;
+};
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.65)',
   },
   sheet: {
@@ -390,13 +405,14 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 16,
     fontWeight: '500',
+    borderColor: COLORS.border,
   },
-  accountsScroll: {
+  wishlistScroll: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
+    paddingVertical: 4,
   },
-  accountSelectorItem: {
+  wishlistItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -407,7 +423,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  accountSelectorText: {
+  wishlistText: {
     color: COLORS.muted,
     fontSize: 13,
     fontWeight: '600',

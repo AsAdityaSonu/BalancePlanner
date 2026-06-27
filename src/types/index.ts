@@ -10,5 +10,6 @@ export interface Transaction {
 export interface MonthData {
   id: string; // "2026-06"
   openingBalance: number;
+  overrideStartingBalance?: number;
   transactions: Transaction[];
 }

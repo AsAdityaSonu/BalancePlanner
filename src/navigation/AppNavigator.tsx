@@ -7,15 +7,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeScreen from '../screens/HomeScreen';
-import OverviewScreen from '../screens/OverviewScreen';
-import WalletScreen from '../screens/WalletScreen';
+import ThingsToBuyScreen from '../screens/ThingsToBuyScreen';
 
 const ACCENT = '#FFFFFF';
 const MUTED = 'rgba(255,255,255,0.40)';
 const BAR_BG = '#121212';
 const BORDER = 'rgba(255,255,255,0.10)';
 
-// Inline simpler icon designs to remove lucide-react-native and react-native-svg dependency entirely
 const PlanIcon = ({ color }: { color: string }) => (
   <View style={styles.tabIconBase}>
     <View style={[styles.tabIconBox, { borderColor: color }]} />
@@ -24,31 +22,22 @@ const PlanIcon = ({ color }: { color: string }) => (
   </View>
 );
 
-const OverviewIcon = ({ color }: { color: string }) => (
-  <View style={[styles.tabIconBase, { flexDirection: 'row', alignItems: 'flex-end', gap: 3 }]}>
-    <View style={{ width: 4, height: 8, backgroundColor: color, borderRadius: 1 }} />
-    <View style={{ width: 4, height: 14, backgroundColor: color, borderRadius: 1 }} />
-    <View style={{ width: 4, height: 11, backgroundColor: color, borderRadius: 1 }} />
-  </View>
-);
-
-const WalletIcon = ({ color }: { color: string }) => (
+const BuyIcon = ({ color }: { color: string }) => (
   <View style={styles.tabIconBase}>
-    <View style={[styles.tabIconBox, { borderColor: color, height: 11, width: 16 }]} />
-    <View style={[styles.tabIconDot, { backgroundColor: color }]} />
+    <View style={{ width: 8, height: 5, borderTopWidth: 2, borderLeftWidth: 2, borderRightWidth: 2, borderTopLeftRadius: 4, borderTopRightRadius: 4, borderColor: color, marginBottom: -2 }} />
+    <View style={[styles.tabIconBox, { borderColor: color, height: 12, width: 15 }]} />
   </View>
 );
 
 export default function AppNavigator() {
-  const [activeTab, setActiveTab] = useState<'Plan' | 'Overview' | 'Wallet'>('Plan');
+  const [activeTab, setActiveTab] = useState<'Plan' | 'Buy'>('Plan');
   const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         {activeTab === 'Plan' && <HomeScreen />}
-        {activeTab === 'Overview' && <OverviewScreen />}
-        {activeTab === 'Wallet' && <WalletScreen />}
+        {activeTab === 'Buy' && <ThingsToBuyScreen />}
       </View>
 
       <View style={[styles.bar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 10 }]}>
@@ -65,24 +54,13 @@ export default function AppNavigator() {
 
         <TouchableOpacity
           style={styles.item}
-          onPress={() => setActiveTab('Overview')}
+          onPress={() => setActiveTab('Buy')}
           activeOpacity={0.8}
         >
-          <View style={[styles.iconWrap, activeTab === 'Overview' && styles.iconWrapActive]}>
-            <OverviewIcon color={activeTab === 'Overview' ? ACCENT : MUTED} />
+          <View style={[styles.iconWrap, activeTab === 'Buy' && styles.iconWrapActive]}>
+            <BuyIcon color={activeTab === 'Buy' ? ACCENT : MUTED} />
           </View>
-          <Text style={[styles.label, { color: activeTab === 'Overview' ? ACCENT : MUTED }]}>Overview</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.item}
-          onPress={() => setActiveTab('Wallet')}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.iconWrap, activeTab === 'Wallet' && styles.iconWrapActive]}>
-            <WalletIcon color={activeTab === 'Wallet' ? ACCENT : MUTED} />
-          </View>
-          <Text style={[styles.label, { color: activeTab === 'Wallet' ? ACCENT : MUTED }]}>Wallet</Text>
+          <Text style={[styles.label, { color: activeTab === 'Buy' ? ACCENT : MUTED }]}>Things to Buy</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -143,12 +121,5 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
     position: 'absolute',
-  },
-  tabIconDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    position: 'absolute',
-    right: 4,
   },
 });

@@ -22,11 +22,11 @@ import {
   Plus,
   Pencil,
   ClipboardList,
-  Landmark,
+  ShoppingBag,
 } from 'lucide-react-native';
 import { MonthData, Transaction } from '../types';
-import { getMonth, saveMonth, getAllMonthIds } from '../storage';
-import { getWallet, saveWallet, BankAccount } from '../storage/wallet';
+import { getMonth, saveMonth, recalculateProgressiveBalances } from '../storage';
+import { getThingsToBuy, saveThingsToBuy, ThingToBuy } from '../storage/thingsToBuy';
 import AddTransactionModal from '../components/AddTransactionModal';
 import {
   formatCurrency,
@@ -41,11 +41,11 @@ import {
 const C = {
   bg: '#000000',
   surface: '#121212',
-  card: '#1C1C1E',
+  card: '#16162E',
   border: 'rgba(255,255,255,0.10)',
-  income: '#30D158', // iOS System Green
-  expense: '#FF453A', // iOS System Red
-  accent: '#FFFFFF',
+  income: '#30D158',
+  expense: '#FF453A',
+  accent: '#7B6EF5',
   text: '#FFFFFF',
   muted: 'rgba(255,255,255,0.45)',
   mutedHigh: 'rgba(255,255,255,0.65)',
@@ -54,109 +54,123 @@ const C = {
 const HomeScreen = () => {
   const [monthId, setMonthId] = useState(getCurrentMonthId());
   const [monthData, setMonthData] = useState<MonthData | null>(null);
-  const [walletAccounts, setWalletAccounts] = useState<BankAccount[]>([]);
+  const [thingsToBuy, setThingsToBuy] = useState<ThingToBuy[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editingOpening, setEditingOpening] = useState(false);
   const [openingInput, setOpeningInput] = useState('');
 
   const loadData = useCallback(async (id: string) => {
+    // Recalculate progressive balances before setting state
+    await recalculateProgressiveBalances();
+
     let data = await getMonth(id);
     if (!data) {
       const prevId = getPrevMonthId(id);
       const prevData = await getMonth(prevId);
       const openingBalance = prevData ? getClosingBalance(prevData) : 0;
       data = { id, openingBalance, transactions: [] };
-      // Save it, but since it has 0 transactions, overview screen will automatically filter it out!
       await saveMonth(data);
     }
     setMonthData(data);
 
-    const wallet = await getWallet();
-    setWalletAccounts(wallet);
+    const wishlist = await getThingsToBuy();
+    setThingsToBuy(wishlist);
   }, []);
 
   useEffect(() => {
     loadData(monthId);
   }, [monthId, loadData]);
 
-  const updateWalletForTransaction = async (
-    accountId: string,
-    amount: number,
-    type: 'income' | 'expense',
-    operation: 'add' | 'delete'
-  ) => {
-    const wallets = await getWallet();
-    const updated = wallets.map(acc => {
-      if (acc.id === accountId) {
-        let diff = amount;
-        if (operation === 'delete') {
-          diff = -amount;
-        }
-        const balanceChange = type === 'income' ? diff : -diff;
-        return {
-          ...acc,
-          balance: acc.balance + balanceChange,
-          updatedAt: Date.now(),
-        };
-      }
-      return acc;
-    });
-    setWalletAccounts(updated);
-    await saveWallet(updated);
-  };
-
-  const handleAddTransaction = async (t: Omit<Transaction, 'id' | 'createdAt'>) => {
+  const handleAddTransaction = async (t: Omit<Transaction, 'id' | 'createdAt'> & { thingToBuyId?: string }) => {
     if (!monthData) return;
-    const newT: Transaction = { ...t, id: Date.now().toString(), createdAt: Date.now() };
+    const newT: Transaction = {
+      id: Date.now().toString(),
+      description: t.description,
+      amount: t.amount,
+      type: t.type,
+      accountId: t.accountId, // uses accountId to save linked thingId
+      createdAt: Date.now(),
+    };
     const updated = { ...monthData, transactions: [...monthData.transactions, newT] };
-    setMonthData(updated);
     await saveMonth(updated);
 
+    // If a wishlist item was linked, mark it as purchased
     if (t.accountId) {
-      await updateWalletForTransaction(t.accountId, t.amount, t.type, 'add');
+      const wishlist = await getThingsToBuy();
+      const updatedWishlist = wishlist.map(item =>
+        item.id === t.accountId ? { ...item, isPurchased: true, allocatedAmount: item.price } : item,
+      );
+      await saveThingsToBuy(updatedWishlist);
     }
+
+    await loadData(monthId);
   };
 
-  const handleUpdateTransaction = async (id: string, updatedPayload: Omit<Transaction, 'id' | 'createdAt'> | null) => {
+  const handleUpdateTransaction = async (
+    id: string,
+    updatedPayload: (Omit<Transaction, 'id' | 'createdAt'> & { thingToBuyId?: string }) | null,
+  ) => {
     if (!monthData) return;
-    
-    // Find old transaction to revert wallet balances
-    const oldTx = monthData.transactions.find(t => t.id === id);
-    
+
+    // Find old transaction
+    const oldTx = monthData.transactions.find(tx => tx.id === id);
+
     if (updatedPayload === null) {
       // Execute Delete
-      const updated = { ...monthData, transactions: monthData.transactions.filter(t => t.id !== id) };
-      setMonthData(updated);
+      const updated = { ...monthData, transactions: monthData.transactions.filter(tx => tx.id !== id) };
       await saveMonth(updated);
 
+      // Revert linked wishlist item status
       if (oldTx && oldTx.accountId) {
-        await updateWalletForTransaction(oldTx.accountId, oldTx.amount, oldTx.type, 'delete');
+        const wishlist = await getThingsToBuy();
+        const updatedWishlist = wishlist.map(item =>
+          item.id === oldTx.accountId ? { ...item, isPurchased: false } : item,
+        );
+        await saveThingsToBuy(updatedWishlist);
       }
     } else {
-      // Execute Edit Update
-      const updatedTransactions = monthData.transactions.map(t => {
-        if (t.id === id) {
-          return { ...t, ...updatedPayload };
+      // Execute Update
+      const updatedTransactions = monthData.transactions.map(tx => {
+        if (tx.id === id) {
+          return { ...tx, ...updatedPayload };
         }
-        return t;
+        return tx;
       });
 
       const updated = { ...monthData, transactions: updatedTransactions };
-      setMonthData(updated);
       await saveMonth(updated);
 
+      // Handle wishlist updates
       if (oldTx) {
-        if (oldTx.accountId) {
-          await updateWalletForTransaction(oldTx.accountId, oldTx.amount, oldTx.type, 'delete');
+        const wishlist = await getThingsToBuy();
+        let wishlistChanged = false;
+        let updatedWishlist = [...wishlist];
+
+        // Revert old wishlist item
+        if (oldTx.accountId && oldTx.accountId !== updatedPayload.accountId) {
+          updatedWishlist = updatedWishlist.map(item =>
+            item.id === oldTx.accountId ? { ...item, isPurchased: false } : item,
+          );
+          wishlistChanged = true;
         }
-        if (updatedPayload.accountId) {
-          await updateWalletForTransaction(updatedPayload.accountId, updatedPayload.amount, updatedPayload.type, 'add');
+
+        // Apply new wishlist item status
+        if (updatedPayload.accountId && oldTx.accountId !== updatedPayload.accountId) {
+          updatedWishlist = updatedWishlist.map(item =>
+            item.id === updatedPayload.accountId ? { ...item, isPurchased: true, allocatedAmount: item.price } : item,
+          );
+          wishlistChanged = true;
+        }
+
+        if (wishlistChanged) {
+          await saveThingsToBuy(updatedWishlist);
         }
       }
     }
-    
+
     setEditingTransaction(null);
+    await loadData(monthId);
   };
 
   const handleDelete = (id: string) => {
@@ -167,14 +181,20 @@ const HomeScreen = () => {
         style: 'destructive',
         onPress: async () => {
           if (!monthData) return;
-          const target = monthData.transactions.find(t => t.id === id);
-          const updated = { ...monthData, transactions: monthData.transactions.filter(t => t.id !== id) };
-          setMonthData(updated);
+          const target = monthData.transactions.find(tx => tx.id === id);
+          const updated = { ...monthData, transactions: monthData.transactions.filter(tx => tx.id !== id) };
           await saveMonth(updated);
 
+          // Revert linked wishlist item
           if (target && target.accountId) {
-            await updateWalletForTransaction(target.accountId, target.amount, target.type, 'delete');
+            const wishlist = await getThingsToBuy();
+            const updatedWishlist = wishlist.map(item =>
+              item.id === target.accountId ? { ...item, isPurchased: false } : item,
+            );
+            await saveThingsToBuy(updatedWishlist);
           }
+
+          await loadData(monthId);
         },
       },
     ]);
@@ -183,21 +203,26 @@ const HomeScreen = () => {
   const handleSaveOpening = async () => {
     if (!monthData) return;
     const val = parseFloat(openingInput.replace(/,/g, ''));
-    if (isNaN(val)) { setEditingOpening(false); return; }
-    const updated = { ...monthData, openingBalance: val };
+    if (isNaN(val)) {
+      setEditingOpening(false);
+      return;
+    }
+    const updated = { ...monthData, overrideStartingBalance: val, openingBalance: val };
     setMonthData(updated);
     await saveMonth(updated);
+
+    await loadData(monthId);
     setEditingOpening(false);
   };
 
   const netBalance = monthData ? getClosingBalance(monthData) : 0;
   const transactions = monthData ? getRunningBalances(monthData) : [];
-  const totalIncome = monthData?.transactions.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0) ?? 0;
-  const totalExpense = monthData?.transactions.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0) ?? 0;
+  const totalIncome = monthData?.transactions.filter(tx => tx.type === 'income').reduce((a, tx) => a + tx.amount, 0) ?? 0;
+  const totalExpense = monthData?.transactions.filter(tx => tx.type === 'expense').reduce((a, tx) => a + tx.amount, 0) ?? 0;
   const balanceColor = netBalance >= 0 ? C.income : C.expense;
 
   const renderTransaction = ({ item }: { item: (typeof transactions)[0] }) => {
-    const linkedAccount = walletAccounts.find(acc => acc.id === item.accountId);
+    const linkedWishItem = thingsToBuy.find(w => w.id === item.accountId);
     return (
       <TouchableOpacity
         style={styles.txRow}
@@ -207,21 +232,33 @@ const HomeScreen = () => {
         }}
         onLongPress={() => handleDelete(item.id)}
         activeOpacity={0.75}
-        delayLongPress={500}>
+        delayLongPress={500}
+      >
         <View style={styles.txLeft}>
-          <View style={[styles.txDot, { backgroundColor: item.type === 'income' ? C.income + '18' : C.expense + '18' }]}>
-            {item.type === 'income'
-              ? <TrendingUp size={16} color={C.income} strokeWidth={2.5} />
-              : <TrendingDown size={16} color={C.expense} strokeWidth={2.5} />}
+          <View
+            style={[
+              styles.txDot,
+              { backgroundColor: item.type === 'income' ? C.income + '18' : C.expense + '18' },
+            ]}
+          >
+            {item.type === 'income' ? (
+              <TrendingUp size={16} color={C.income} strokeWidth={2.5} />
+            ) : (
+              <TrendingDown size={16} color={C.expense} strokeWidth={2.5} />
+            )}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.txDesc} numberOfLines={1}>{item.description}</Text>
+            <Text style={styles.txDesc} numberOfLines={1}>
+              {item.description}
+            </Text>
             <View style={styles.txMetaRow}>
-              <Text style={styles.txNet}>Net {formatCurrency(item.runningBalance)}</Text>
-              {linkedAccount && (
+              <Text style={styles.txNet}>Progressive Net: {formatCurrency(item.runningBalance)}</Text>
+              {linkedWishItem && (
                 <View style={styles.linkedBadge}>
-                  <Landmark size={10} color={C.accent} />
-                  <Text style={styles.linkedBadgeText} numberOfLines={1}>{linkedAccount.name}</Text>
+                  <ShoppingBag size={10} color="#FFF" />
+                  <Text style={styles.linkedBadgeText} numberOfLines={1}>
+                    Wishlist: {linkedWishItem.name}
+                  </Text>
                 </View>
               )}
             </View>
@@ -243,7 +280,7 @@ const HomeScreen = () => {
           <View style={styles.logoLineHorizontal} />
           <View style={styles.logoLineVertical} />
         </View>
-        <Text style={styles.logoText}>current</Text>
+        <Text style={styles.logoText}>balance planner</Text>
       </View>
 
       {/* Month Selector */}
@@ -259,14 +296,18 @@ const HomeScreen = () => {
 
       {/* Balance Card */}
       <View style={styles.balCard}>
-        <Text style={styles.balLabel}>PROJECTED NET</Text>
+        <Text style={styles.balLabel}>PROJECTED CLOSING BALANCE</Text>
         <Text style={[styles.balAmount, { color: balanceColor }]}>{formatCurrency(netBalance)}</Text>
 
         {/* Opening balance */}
         <TouchableOpacity
           style={styles.openRow}
-          onPress={() => { setOpeningInput(String(monthData?.openingBalance ?? 0)); setEditingOpening(true); }}
-          activeOpacity={0.7}>
+          onPress={() => {
+            setOpeningInput(String(monthData?.openingBalance ?? 0));
+            setEditingOpening(true);
+          }}
+          activeOpacity={0.7}
+        >
           <Text style={styles.openLabel}>Starting Balance</Text>
           <View style={styles.openRight}>
             <Text style={styles.openValue}>{formatCurrency(monthData?.openingBalance ?? 0)}</Text>
@@ -303,7 +344,9 @@ const HomeScreen = () => {
     <View style={styles.emptyWrap}>
       <ClipboardList size={52} color={C.muted} strokeWidth={1.5} />
       <Text style={styles.emptyTitle}>Nothing planned yet</Text>
-      <Text style={styles.emptyBody}>Tap + to plan your income{'\n'}and expenses for {getMonthLabel(monthId)}</Text>
+      <Text style={styles.emptyBody}>
+        Tap + to plan your income{'\n'}and expenses for {getMonthLabel(monthId)}
+      </Text>
     </View>
   );
 
@@ -322,26 +365,26 @@ const HomeScreen = () => {
       />
 
       {/* FAB */}
-      <TouchableOpacity 
-        style={styles.fab} 
+      <TouchableOpacity
+        style={styles.fab}
         onPress={() => {
           setEditingTransaction(null);
           setShowAdd(true);
-        }} 
+        }}
         activeOpacity={0.85}
       >
         <Plus size={28} color="#fff" strokeWidth={2} />
       </TouchableOpacity>
 
-      <AddTransactionModal 
-        visible={showAdd} 
+      <AddTransactionModal
+        visible={showAdd}
         onClose={() => {
           setShowAdd(false);
           setEditingTransaction(null);
-        }} 
+        }}
         onAdd={handleAddTransaction}
         onUpdate={handleUpdateTransaction}
-        accounts={walletAccounts}
+        thingsToBuy={thingsToBuy}
         editingTransaction={editingTransaction}
       />
 
@@ -380,156 +423,194 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   list: { paddingBottom: 100 },
 
-  monthRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16,
-  },
-  navBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: C.surface, alignItems: 'center',
-    justifyContent: 'center', borderWidth: 1, borderColor: C.border,
-  },
-  monthLabel: { color: C.text, fontSize: 20, fontWeight: '700', letterSpacing: 0.2 },
-
-  balCard: {
-    marginHorizontal: 16, backgroundColor: C.card,
-    borderRadius: 22, padding: 22,
-    borderWidth: 1, borderColor: C.border, marginBottom: 16,
-  },
-  balLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
-  balAmount: { fontSize: 42, fontWeight: '800', letterSpacing: -1, marginBottom: 16 },
-
-  openRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16,
-    borderWidth: 1, borderColor: C.border,
-  },
-  openLabel: { color: C.muted, fontSize: 13, fontWeight: '500' },
-  openRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  openValue: { color: C.mutedHigh, fontSize: 14, fontWeight: '600' },
-
-  summaryRow: {
-    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden',
-  },
-  summaryItem: { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 5 },
-  summaryDivider: { width: 1, backgroundColor: C.border },
-  summaryLabel: { color: C.muted, fontSize: 11, fontWeight: '600' },
-  summaryVal: { fontSize: 14, fontWeight: '700' },
-
-  entriesHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, marginBottom: 10,
-  },
-  entriesTitle: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  entriesHint: { color: C.muted, fontSize: 11 },
-
-  txRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginHorizontal: 16, marginBottom: 10,
-    backgroundColor: C.surface, borderRadius: 16,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderWidth: 1, borderColor: C.border,
-  },
-  txLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  txDot: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  txDesc: { color: C.text, fontSize: 15, fontWeight: '600', maxWidth: 170 },
-  txMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  txNet: { color: C.muted, fontSize: 12 },
-  linkedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    maxWidth: 90,
-  },
-  linkedBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  txAmount: { fontSize: 16, fontWeight: '700' },
-
-  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
-  emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 },
-
-  fab: {
-    position: 'absolute', bottom: 32, right: 24,
-    width: 58, height: 58, borderRadius: 18,
-    backgroundColor: '#7B6EF5',
-    alignItems: 'center', justifyContent: 'center',
-  },
-
-  editOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  editCard: {
-    backgroundColor: C.card, borderRadius: 24,
-    padding: 28, width: '85%',
-    borderWidth: 1, borderColor: C.border,
-  },
-  editTitle: { color: C.text, fontSize: 20, fontWeight: '700', marginBottom: 6 },
-  editSub: { color: C.muted, fontSize: 13, marginBottom: 20 },
-  editInputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 14, borderWidth: 1.5,
-    borderColor: C.accent + '50', paddingHorizontal: 16, marginBottom: 20,
-  },
-  rupee: { fontSize: 22, fontWeight: '700', marginRight: 8 },
-  editInput: { flex: 1, paddingVertical: 14, color: C.text, fontSize: 24, fontWeight: '700' },
-  editSave: { backgroundColor: C.accent, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-  editSaveText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-
   logoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
     gap: 8,
-    paddingTop: 24,
-    paddingBottom: 8,
   },
   logoIcon: {
     width: 24,
     height: 24,
     borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
+    backgroundColor: C.accent,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   logoDotActive: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#7B6EF5',
-    position: 'absolute',
+    backgroundColor: '#000',
   },
   logoLineHorizontal: {
     width: 12,
     height: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.40)',
+    backgroundColor: '#000',
     position: 'absolute',
+    bottom: 4,
   },
   logoLineVertical: {
     width: 2,
     height: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.40)',
+    backgroundColor: '#000',
     position: 'absolute',
+    right: 4,
   },
   logoText: {
-    color: '#FFFFFF',
-    fontSize: 18,
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'lowercase',
+    letterSpacing: -0.5,
+    textTransform: 'uppercase',
   },
+
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  navBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  monthLabel: { color: C.text, fontSize: 20, fontWeight: '700', letterSpacing: 0.2 },
+
+  balCard: {
+    marginHorizontal: 16,
+    backgroundColor: C.card,
+    borderRadius: 22,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 16,
+  },
+  balLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, marginBottom: 8 },
+  balAmount: { fontSize: 38, fontWeight: '800', letterSpacing: -1, marginBottom: 18 },
+
+  openRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 18,
+  },
+  openLabel: { color: C.muted, fontSize: 13, fontWeight: '500' },
+  openRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  openValue: { color: C.text, fontSize: 14, fontWeight: '700' },
+
+  summaryRow: { flexDirection: 'row', gap: 16 },
+  summaryItem: { flex: 1, gap: 4 },
+  summaryDivider: { width: 1, backgroundColor: C.border },
+  summaryLabel: { color: C.muted, fontSize: 11, fontWeight: '500' },
+  summaryVal: { fontSize: 15, fontWeight: '700' },
+
+  entriesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  entriesTitle: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+  entriesHint: { color: C.muted, fontSize: 10 },
+
+  txRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: C.surface,
+    marginHorizontal: 16,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  txLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  txDot: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  txDesc: { color: C.text, fontSize: 15, fontWeight: '600' },
+  txMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  txNet: { color: C.muted, fontSize: 11 },
+  linkedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(123, 110, 245, 0.18)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    maxWidth: 120,
+  },
+  linkedBadgeText: { color: '#7B6EF5', fontSize: 9, fontWeight: '700' },
+  txAmount: { fontSize: 16, fontWeight: '700' },
+
+  emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 12, paddingHorizontal: 32 },
+  emptyTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
+  emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 18 },
+
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+
+  editOverlay: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.85)' },
+  editCard: {
+    backgroundColor: C.card,
+    marginHorizontal: 24,
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  editTitle: { color: C.text, fontSize: 20, fontWeight: '700' },
+  editSub: { color: C.muted, fontSize: 13, marginTop: 4, marginBottom: 20 },
+  editInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.accent + '40',
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  rupee: { fontSize: 22, fontWeight: '700', marginRight: 8 },
+  editInput: { flex: 1, paddingVertical: 14, color: C.text, fontSize: 22, fontWeight: '700' },
+  editSave: { backgroundColor: C.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  editSaveText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
 });
 
 export default HomeScreen;
